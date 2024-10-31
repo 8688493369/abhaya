@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-Fencing - ABHAYA</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            padding-bottom: 60px; /* Adjust according to footer height */
+        }
+
+        .container {
+            margin-top: 30px;
+        }
+
+        .map-container {
+            height: 500px;
+            margin-bottom: 30px;
+        }
+
+        .info-box {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+
+        .info-box:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .info-box h2 {
+            margin-top: 0;
+        }
+
+        footer {
+            background-color: green;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+        footer a {
+            color: #f4f4f4;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        header {
+            background-color: green; /* Set the header color to green */
+        }
+    </style>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="text-white text-center py-3">
+        <h1>ABHAYA - Geo-Fencing</h1>
+        <p>Monitor and Manage Virtual Boundaries</p>
+    </header>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8">
+                <div id="map" class="map-container animate__animated animate__fadeIn"></div>
+            </div>
+            <div class="col-md-4">
+                <div class="info-box animate__animated animate__fadeIn">
+                    <h2>Set Up a Geo-Fence</h2>
+                    <p>Define your virtual boundary on the map to monitor specific areas.</p>
+                    <input type="number" id="fence-radius" class="form-control mb-2" placeholder="Enter radius in meters">
+                    <button id="set-fence" class="btn btn-primary">Set Fence Mode</button>
+                </div>
+                <div class="info-box animate__animated animate__fadeIn">
+                    <h2>Alerts</h2>
+                    <p>Receive notifications when a device enters or exits the geo-fenced area.</p>
+                    <div id="notification-box"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map, geoFenceCircle, userMarker;
+        let userPosition = null;
+
+        // Initialize Leaflet map with user's current location
+        function initMap() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    userPosition = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Create the map centered on the user's position
+                    map = L.map('map').setView([userPosition.lat, userPosition.lng], 15);
+
+                    // Add OpenStreetMap tiles
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap'
+                    }).addTo(map);
+
+                    // Add a marker for the user's current position
+                    userMarker = L.marker([userPosition.lat, userPosition.lng]).addTo(map)
+                        .bindPopup("You are here").openPopup();
+
+                    // Set geo-fence when button is clicked
+                    document.getElementById('set-fence').addEventListener('click', () => {
+                        const radius = parseInt(document.getElementById('fence-radius').value) || 500;
+                        setGeoFence(userPosition, radius);
+                    });
+
+                    // Automatically start tracking location
+                    startTracking();
+                }, () => {
+                    alert("Geolocation failed. Please enable location services.");
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Set geo-fence circle on the map
+        function setGeoFence(latLng, radius) {
+            if (geoFenceCircle) {
+                map.removeLayer(geoFenceCircle);  // Remove old geo-fence
+            }
+
+            geoFenceCircle = L.circle([latLng.lat, latLng.lng], {
+                color: 'blue',
+                fillColor: '#0000FF',
+                fillOpacity: 0.35,
+                radius: radius
+            }).addTo(map);
+
+            alert(`Geo-fence set with a radius of ${radius} meters.`);
+        }
+
+        // Start tracking the user's location
+        function startTracking() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(position => {
+                    const newLatLng = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Update user marker and center map
+                    userMarker.setLatLng(newLatLng).update();
+                    map.setView(newLatLng, 15);
+
+                    // Check if user is inside or outside the geo-fence
+                    if (geoFenceCircle) {
+                        const distance = map.distance(
+                            geoFenceCircle.getLatLng(),
+                            L.latLng(newLatLng)
+                        );
+
+                        if (distance > geoFenceCircle.getRadius()) {
+                            notifyUser("You have exited the geo-fenced area!");
+                        } else {
+                            notifyUser("You are inside the geo-fenced area.");
+                        }
+                    }
+                }, handleError, { enableHighAccuracy: true });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Notify user with messages
+        function notifyUser(message) {
+            const notificationBox = document.getElementById('notification-box');
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', 'alert-warning', 'mt-2');
+            alertDiv.textContent = message;
+            notificationBox.innerHTML = '';  // Clear previous notifications
+            notificationBox.appendChild(alertDiv);
+        }
+
+        // Handle errors with geolocation
+        function handleError(error) {
+            console.error("Error occurred while tracking location:", error);
+            alert("Unable to retrieve your location.");
+        }
+
+        // Load map when window is loaded
+        window.onload = initMap;
+    </script>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 ABHAYA. All rights reserved.</p>
+        <p><a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a></p>
+    </footer>
+</body>
+</html>
