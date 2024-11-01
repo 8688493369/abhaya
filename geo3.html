@@ -8,15 +8,13 @@
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <!-- Animate.css -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             margin: 0;
             padding: 0;
-            padding-bottom: 60px; /* Adjust according to footer height */
+            padding-bottom: 60px;
         }
 
         .container {
@@ -67,11 +65,9 @@
         }
         
         header {
-            background-color: green; /* Set the header color to green */
+            background-color: green;
         }
     </style>
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 </head>
 <body>
     <header class="text-white text-center py-3">
@@ -104,7 +100,7 @@
         let map, geoFenceCircle, userMarker;
         let userPosition = null;
 
-        // Initialize Leaflet map with user's current location
+        // Initialize Google Maps with user's current location
         function initMap() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(position => {
@@ -114,17 +110,17 @@
                     };
 
                     // Create the map centered on the user's position
-                    map = L.map('map').setView([userPosition.lat, userPosition.lng], 15);
-
-                    // Add OpenStreetMap tiles
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        attribution: '© OpenStreetMap'
-                    }).addTo(map);
+                    map = new google.maps.Map(document.getElementById('map'), {
+                        center: userPosition,
+                        zoom: 15
+                    });
 
                     // Add a marker for the user's current position
-                    userMarker = L.marker([userPosition.lat, userPosition.lng]).addTo(map)
-                        .bindPopup("You are here").openPopup();
+                    userMarker = new google.maps.Marker({
+                        position: userPosition,
+                        map: map,
+                        title: "You are here"
+                    });
 
                     // Set geo-fence when button is clicked
                     document.getElementById('set-fence').addEventListener('click', () => {
@@ -145,15 +141,19 @@
         // Set geo-fence circle on the map
         function setGeoFence(latLng, radius) {
             if (geoFenceCircle) {
-                map.removeLayer(geoFenceCircle);  // Remove old geo-fence
+                geoFenceCircle.setMap(null);  // Remove old geo-fence
             }
 
-            geoFenceCircle = L.circle([latLng.lat, latLng.lng], {
-                color: 'blue',
-                fillColor: '#0000FF',
+            geoFenceCircle = new google.maps.Circle({
+                strokeColor: "#0000FF",
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: "#0000FF",
                 fillOpacity: 0.35,
+                map: map,
+                center: latLng,
                 radius: radius
-            }).addTo(map);
+            });
 
             alert(`Geo-fence set with a radius of ${radius} meters.`);
         }
@@ -168,14 +168,14 @@
                     };
 
                     // Update user marker and center map
-                    userMarker.setLatLng(newLatLng).update();
-                    map.setView(newLatLng, 15);
+                    userMarker.setPosition(newLatLng);
+                    map.setCenter(newLatLng);
 
                     // Check if user is inside or outside the geo-fence
                     if (geoFenceCircle) {
-                        const distance = map.distance(
-                            geoFenceCircle.getLatLng(),
-                            L.latLng(newLatLng)
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            geoFenceCircle.getCenter(),
+                            new google.maps.LatLng(newLatLng)
                         );
 
                         if (distance > geoFenceCircle.getRadius()) {
@@ -205,12 +205,10 @@
             console.error("Error occurred while tracking location:", error);
             alert("Unable to retrieve your location.");
         }
-
-        // Load map when window is loaded
-        window.onload = initMap;
     </script>
-      <a href="index.html.HTML">
-            <button>BACK</button>
+
+    <!-- Google Maps API with Geometry Library -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=geometry&callback=initMap" async defer></script>
 
     <!-- Footer -->
     <footer>
